@@ -1,0 +1,88 @@
+{
+  "listen": "127.0.0.1:8080",
+  "pricing_file": "pricing.json",
+  "providers": [
+    {
+      "name": "gemini",
+      "type": "gemini",
+      "api_key_env": "GEMINI_API_KEY"
+    },
+    {
+      "name": "groq",
+      "type": "openai",
+      "base_url": "https://api.groq.com/openai/v1",
+      "api_key_env": "GROQ_API_KEY"
+    },
+    {
+      "name": "openrouter",
+      "type": "openai",
+      "base_url": "https://openrouter.ai/api/v1",
+      "api_key_env": "OPENROUTER_API_KEY"
+    },
+    {
+      "name": "huggingface",
+      "type": "openai",
+      "base_url": "https://router.huggingface.co/v1",
+      "api_key_env": "HF_TOKEN"
+    },
+    {
+      "name": "mock",
+      "type": "mock"
+    },
+    {
+      "name": "mock-flaky",
+      "type": "mock",
+      "mock": {
+        "fail_status": 429
+      }
+    }
+  ],
+  "routes": {
+    "default": {
+      "targets": [
+        {
+          "provider": "gemini",
+          "model": "gemini-2.5-flash"
+        },
+        {
+          "provider": "groq",
+          "model": "openai/gpt-oss-120b"
+        },
+        {
+          "provider": "openrouter",
+          "model": "openrouter/free"
+        }
+      ],
+      "retries": 2,
+      "request_timeout_ms": 30000
+    },
+    "fast": {
+      "targets": [
+        {
+          "provider": "groq",
+          "model": "openai/gpt-oss-20b"
+        },
+        {
+          "provider": "gemini",
+          "model": "gemini-2.5-flash-lite"
+        }
+      ],
+      "retries": 1,
+      "request_timeout_ms": 15000
+    },
+    "demo": {
+      "targets": [
+        {
+          "provider": "mock-flaky",
+          "model": "mock-1"
+        },
+        {
+          "provider": "mock",
+          "model": "mock-2"
+        }
+      ],
+      "retries": 1,
+      "request_timeout_ms": 5000
+    }
+  }
+}

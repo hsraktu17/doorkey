@@ -1,0 +1,20 @@
+# Binaries
+/doorkey
+/bin/
+*.exe
+
+# Test and coverage output
+*.test
+*.out
+coverage.html
+
+# Local config and secrets (commit doorkey.example.json instead)
+.env
+.env.*
+!.env.example
+doorkey.json
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store
