@@ -1,0 +1,23 @@
+{
+  "listen": "127.0.0.1:18089",
+  "pricing_file": "pricing.json",
+  "providers": [
+    { "name": "mock", "type": "mock" },
+    { "name": "mock-flaky", "type": "mock", "mock": { "fail_status": 429 } },
+    { "name": "mock-down", "type": "mock", "mock": { "fail_status": 500 } },
+    { "name": "mock-slow", "type": "mock", "mock": { "latency_ms": 250 } }
+  ],
+  "routes": {
+    "default": { "targets": [{ "provider": "mock", "model": "mock-1" }], "retries": 0, "request_timeout_ms": 5000 },
+    "demo": {
+      "targets": [
+        { "provider": "mock-flaky", "model": "mock-1" },
+        { "provider": "mock", "model": "mock-2" }
+      ],
+      "retries": 1,
+      "request_timeout_ms": 5000
+    },
+    "slow": { "targets": [{ "provider": "mock-slow", "model": "mock-slow-1" }], "retries": 0, "request_timeout_ms": 5000 },
+    "broken": { "targets": [{ "provider": "mock-down", "model": "mock-1" }], "retries": 0, "request_timeout_ms": 5000 }
+  }
+}

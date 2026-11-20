@@ -35,9 +35,12 @@ const maxBody = 4 << 20
 type Options struct {
 	Router *router.Router
 	Routes map[string]router.Route
-	Log    *usage.Logger
+	// Recorder finishes every request record (pricing, metrics, access log).
+	Recorder *usage.Recorder
 	// APIKey, when set, must be sent as "Authorization: Bearer <key>".
 	APIKey string
+	// Metrics, when set, is served at GET /admin/metrics.
+	Metrics *usage.Store
 }
 
 // Handler serves the doorkey HTTP API.
@@ -54,7 +57,36 @@ func New(opts Options) *Handler {
 	h.mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
+	if opts.Metrics != nil {
+		h.mux.HandleFunc("GET /admin/metrics", h.metrics)
+	}
 	return h
+}
+
+// Metrics window limits.
+const (
+	defaultMetricsWindow = 15 * time.Minute
+	maxMetricsWindow     = 24 * time.Hour
+)
+
+// metrics serves APM numbers for the dashboard. ?window= takes a Go
+// duration such as 5m or 1h.
+func (h *Handler) metrics(w http.ResponseWriter, r *http.Request) {
+	if !h.authorized(r) {
+		writeError(w, http.StatusUnauthorized, "authentication_error", "invalid or missing doorkey API key")
+		return
+	}
+	window := defaultMetricsWindow
+	if v := r.URL.Query().Get("window"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil || d < time.Minute || d > maxMetricsWindow {
+			writeError(w, http.StatusBadRequest, "invalid_request_error", "window must be a duration between 1m and 24h, like 15m")
+			return
+		}
+		window = d
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, h.opts.Metrics.Snapshot(window))
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { h.mux.ServeHTTP(w, r) }
@@ -67,7 +99,7 @@ func (h *Handler) chat(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Doorkey-Request-Id", rec.RequestID)
 	defer func() {
 		rec.Latency = time.Since(start)
-		h.opts.Log.Log(rec)
+		h.opts.Recorder.Finish(rec)
 	}()
 
 	fail := func(status int, typ, msg string) {

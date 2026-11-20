@@ -33,7 +33,9 @@ internal/providers/   provider interface + adapters:
                         mock      fake provider for tests and demos
 internal/sse/         SSE reader and writer
 internal/config/      config file loading and provider setup
-internal/usage/       pricing, cost, request logs
+internal/usage/       pricing, cost, in-memory metrics for the dashboard
+internal/logger/      slog setup and the per-request log line
+web/                  Next.js APM dashboard (see below)
 ```
 
 Planned, not created yet: `internal/dal/` (Postgres, Phase 2) and an Anthropic adapter (paid only).
@@ -113,7 +115,7 @@ Streams only fall back before the first chunk reaches the client.
 ### Response headers and logs
 
 Every response has `X-Doorkey-Request-Id`, `X-Doorkey-Provider`, `X-Doorkey-Model` and
-`X-Doorkey-Attempts`. Each request also writes one JSON log line to stdout with the route,
+`X-Doorkey-Attempts`. Each request also writes one log line to stdout with the route,
 provider, status, latency, time to first token, tokens, cost, and what was tried
 (for example `"tried":"gemini:429 groq:200"`).
 
@@ -123,17 +125,54 @@ provider, status, latency, time to first token, tokens, cost, and what was tried
 |---|---|
 | `-config`, `DOORKEY_CONFIG` | Config file (default `doorkey.json`, falling back to the example) |
 | `-addr`, `DOORKEY_ADDR` | Listen address, overrides `listen` in the config |
-| `DOORKEY_API_KEY` | If set, clients must send `Authorization: Bearer <key>` |
+| `DOORKEY_API_KEY` | If set, clients must send `Authorization: Bearer <key>` (also guards `/admin/metrics`) |
+| `DOORKEY_LOG_FORMAT` | `json` (default) or `text` |
+| `DOORKEY_LOG_LEVEL` | `debug`, `info` (default), `warn` or `error` |
 
 A provider whose key env var is empty is disabled: it answers 401, so routes skip past it.
+
+## Dashboard
+
+`web/` is a Next.js 16 APM dashboard for the gateway: requests, error rate, latency
+p50/p95/p99, time to first token, fallback rate, tokens and cost; requests and latency
+per minute; per-provider attempt outcomes (2xx / 429 / 4xx / 5xx / network), so a
+first-choice provider that keeps getting rate-limited shows up even when fallback
+hides it from clients; routes; and the last 50 requests with their attempt chains.
+It polls every 5 seconds and pauses while the tab is hidden.
+
+The data comes from `GET /admin/metrics?window=15m` (1m to 24h), which the gateway
+keeps in memory for the last 10,000 requests. It resets when the gateway restarts.
+The browser only talks to the dashboard's own `/api/metrics`; the gateway URL and key
+stay on the Next.js server.
+
+Try it with mock providers only (nothing reaches a real API):
+
+```bash
+make web-install          # npm ci + Playwright's Chromium (~100 MB)
+make demo-gateway         # terminal 1: mocks-only gateway on :18089
+make traffic              # terminal 2: steady demo traffic
+cd web && DOORKEY_URL=http://127.0.0.1:18089 npm run dev   # terminal 3
+```
+
+To watch your real gateway instead, copy `web/.env.example` to `web/.env.local` and set
+`DOORKEY_URL` and `DOORKEY_API_KEY`, then `make web-dev`.
+
+Tests:
+
+- `make web-test`: ESLint, type check, and Vitest (formatters, the API route, components,
+  the dashboard's polling and error states). The TypeScript types are checked against
+  `internal/usage/testdata/metrics.sample.json`, which the Go tests generate
+  (`go test ./internal/usage -run TestGolden -update`), so the two sides can't drift.
+- `make web-e2e`: Playwright starts the mocks-only gateway and a production build,
+  sends traffic, and checks the page.
 
 ## Roadmap
 
 - **Phase 1:** `/v1/chat/completions`, OpenAI-compatible and Gemini adapters, streaming,
-  retries, timeouts, fallback, request logs with tokens and cost.
+  retries, timeouts, fallback, request logs with tokens and cost, APM dashboard.
 - **Phase 2:** virtual keys, per-key rate limits and budgets (Redis), weighted load
   balancing, exact-match cache.
-- **Phase 3:** semantic cache (pgvector), guardrails, dashboard, OpenTelemetry,
+- **Phase 3:** semantic cache (pgvector), guardrails, OpenTelemetry,
   Docker and Helm.
 
 ## Benchmarks

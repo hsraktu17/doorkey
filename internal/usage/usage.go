@@ -1,12 +1,11 @@
-// Package usage prices requests and writes one structured log line per
-// request: provider, model, latency, tokens, cost and what was tried.
+// Package usage holds the per-request Record, prices it, and keeps the
+// in-memory metrics behind the dashboard. Writing log lines is package
+// logger's job.
 package usage
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -83,68 +82,31 @@ func (r *Record) Apply(res router.Result) {
 	r.Provider, r.Model, r.Attempts = res.Provider, res.Model, res.Attempts
 }
 
-// Logger writes records with slog.
-type Logger struct {
-	log     *slog.Logger
+// Recorder finishes a request record: it prices the record (when it has
+// usage) and hands it to every sink, such as the metrics Store and the
+// request log in package logger.
+type Recorder struct {
 	pricing Pricing
+	sinks   []Sink
 }
 
-// NewLogger returns a Logger.
-func NewLogger(log *slog.Logger, pricing Pricing) *Logger {
-	return &Logger{log: log, pricing: pricing}
+// NewRecorder returns a Recorder.
+func NewRecorder(pricing Pricing, sinks ...Sink) *Recorder {
+	return &Recorder{pricing: pricing, sinks: sinks}
 }
 
-// Log prices the record (when it has usage) and writes it.
-func (l *Logger) Log(r *Record) {
+// Finish prices r and passes it to every sink.
+func (rc *Recorder) Finish(r *Record) {
 	if r.Usage != nil && r.Provider != "" {
-		r.CostUSD, r.Priced = l.pricing.Cost(r.Provider, r.Model, *r.Usage)
+		r.CostUSD, r.Priced = rc.pricing.Cost(r.Provider, r.Model, *r.Usage)
 	}
-
-	attrs := []slog.Attr{
-		slog.String("request_id", r.RequestID),
-		slog.String("route", r.Route),
-		slog.String("requested_model", r.RequestedModel),
-		slog.Bool("stream", r.Stream),
-		slog.String("provider", r.Provider),
-		slog.String("model", r.Model),
-		slog.Int("status", r.Status),
-		slog.Float64("latency_ms", ms(r.Latency)),
-		slog.Int("attempts", len(r.Attempts)),
+	for _, s := range rc.sinks {
+		s.Add(r)
 	}
-	if len(r.Attempts) > 1 {
-		attrs = append(attrs, slog.String("tried", tried(r.Attempts)))
-	}
-	if r.Stream && r.TTFT > 0 {
-		attrs = append(attrs, slog.Float64("ttft_ms", ms(r.TTFT)))
-	}
-	if r.Usage != nil {
-		attrs = append(attrs,
-			slog.Int("prompt_tokens", r.Usage.PromptTokens),
-			slog.Int("completion_tokens", r.Usage.CompletionTokens),
-			slog.Float64("cost_usd", r.CostUSD),
-		)
-		if !r.Priced {
-			attrs = append(attrs, slog.Bool("unpriced", true))
-		}
-	}
-	if r.StreamError {
-		attrs = append(attrs, slog.Bool("stream_error", true))
-	}
-	if r.Error != "" {
-		attrs = append(attrs, slog.String("error", r.Error))
-	}
-
-	level := slog.LevelInfo
-	if r.Status >= 500 || r.StreamError {
-		level = slog.LevelError
-	} else if r.Status >= 400 {
-		level = slog.LevelWarn
-	}
-	l.log.LogAttrs(context.Background(), level, "request", attrs...)
 }
 
-// tried summarises attempts as "gemini:429 groq:200".
-func tried(as []router.Attempt) string {
+// Tried summarises attempts as "gemini:429 groq:200".
+func Tried(as []router.Attempt) string {
 	parts := make([]string, len(as))
 	for i, a := range as {
 		parts[i] = fmt.Sprintf("%s:%d", a.Provider, a.Status)
@@ -152,6 +114,7 @@ func tried(as []router.Attempt) string {
 	return strings.Join(parts, " ")
 }
 
-func ms(d time.Duration) float64 {
+// MS converts a duration to milliseconds with microsecond precision.
+func MS(d time.Duration) float64 {
 	return float64(d.Microseconds()) / 1000
 }

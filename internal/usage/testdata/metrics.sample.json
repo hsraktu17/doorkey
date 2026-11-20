@@ -1,0 +1,317 @@
+{
+  "generated_at": "2026-11-20T10:03:30Z",
+  "started_at": "2026-11-20T09:00:30Z",
+  "window_seconds": 300,
+  "capacity": 100,
+  "totals": {
+    "requests": 6,
+    "errors": 3,
+    "error_rate": 0.5,
+    "fallbacks": 2,
+    "fallback_rate": 0.3333,
+    "stream_requests": 2,
+    "requests_per_min": 1.2,
+    "latency_ms": {
+      "p50": 8,
+      "p95": 900,
+      "p99": 900
+    },
+    "ttft_ms": {
+      "p50": 3,
+      "p95": 50,
+      "p99": 50
+    },
+    "prompt_tokens": 14,
+    "completion_tokens": 30,
+    "cost_usd": 0.0001
+  },
+  "series": [
+    {
+      "start": "2026-11-20T09:58:00Z",
+      "requests": 0,
+      "errors": 0,
+      "p50_ms": 0,
+      "p95_ms": 0
+    },
+    {
+      "start": "2026-11-20T09:59:00Z",
+      "requests": 0,
+      "errors": 0,
+      "p50_ms": 0,
+      "p95_ms": 0
+    },
+    {
+      "start": "2026-11-20T10:00:00Z",
+      "requests": 2,
+      "errors": 0,
+      "p50_ms": 5,
+      "p95_ms": 8
+    },
+    {
+      "start": "2026-11-20T10:01:00Z",
+      "requests": 2,
+      "errors": 1,
+      "p50_ms": 1,
+      "p95_ms": 120
+    },
+    {
+      "start": "2026-11-20T10:02:00Z",
+      "requests": 1,
+      "errors": 1,
+      "p50_ms": 900,
+      "p95_ms": 900
+    },
+    {
+      "start": "2026-11-20T10:03:00Z",
+      "requests": 1,
+      "errors": 1,
+      "p50_ms": 400,
+      "p95_ms": 400
+    }
+  ],
+  "providers": [
+    {
+      "provider": "gemini",
+      "attempts": 3,
+      "served": 0,
+      "failure_rate": 1,
+      "status_2xx": 0,
+      "status_429": 2,
+      "status_4xx": 1,
+      "status_5xx": 0,
+      "network_errors": 0,
+      "latency_ms": {
+        "p50": 300,
+        "p95": 300,
+        "p99": 300
+      },
+      "tokens": 0,
+      "cost_usd": 0
+    },
+    {
+      "provider": "groq",
+      "attempts": 3,
+      "served": 2,
+      "failure_rate": 0.3333,
+      "status_2xx": 2,
+      "status_429": 0,
+      "status_4xx": 1,
+      "status_5xx": 0,
+      "network_errors": 0,
+      "latency_ms": {
+        "p50": 45,
+        "p95": 118,
+        "p99": 118
+      },
+      "tokens": 30,
+      "cost_usd": 0.0001
+    },
+    {
+      "provider": "mock",
+      "attempts": 2,
+      "served": 2,
+      "failure_rate": 0,
+      "status_2xx": 2,
+      "status_429": 0,
+      "status_4xx": 0,
+      "status_5xx": 0,
+      "network_errors": 0,
+      "latency_ms": {
+        "p50": 2,
+        "p95": 2,
+        "p99": 2
+      },
+      "tokens": 14,
+      "cost_usd": 0
+    },
+    {
+      "provider": "mock-flaky",
+      "attempts": 2,
+      "served": 0,
+      "failure_rate": 1,
+      "status_2xx": 0,
+      "status_429": 2,
+      "status_4xx": 0,
+      "status_5xx": 0,
+      "network_errors": 0,
+      "latency_ms": {
+        "p50": 1,
+        "p95": 1,
+        "p99": 1
+      },
+      "tokens": 0,
+      "cost_usd": 0
+    },
+    {
+      "provider": "openrouter",
+      "attempts": 1,
+      "served": 0,
+      "failure_rate": 1,
+      "status_2xx": 0,
+      "status_429": 0,
+      "status_4xx": 1,
+      "status_5xx": 0,
+      "network_errors": 0,
+      "latency_ms": {
+        "p50": 0,
+        "p95": 0,
+        "p99": 0
+      },
+      "tokens": 0,
+      "cost_usd": 0
+    }
+  ],
+  "routes": [
+    {
+      "route": "demo",
+      "requests": 2,
+      "errors": 0,
+      "fallbacks": 2,
+      "latency_ms": {
+        "p50": 5,
+        "p95": 8,
+        "p99": 8
+      }
+    },
+    {
+      "route": "fast",
+      "requests": 2,
+      "errors": 1,
+      "fallbacks": 0,
+      "latency_ms": {
+        "p50": 120,
+        "p95": 400,
+        "p99": 400
+      }
+    },
+    {
+      "route": "default",
+      "requests": 1,
+      "errors": 1,
+      "fallbacks": 0,
+      "latency_ms": {
+        "p50": 1,
+        "p95": 1,
+        "p99": 1
+      }
+    },
+    {
+      "route": "direct",
+      "requests": 1,
+      "errors": 1,
+      "fallbacks": 0,
+      "latency_ms": {
+        "p50": 900,
+        "p95": 900,
+        "p99": 900
+      }
+    }
+  ],
+  "recent": [
+    {
+      "time": "2026-11-20T10:03:00Z",
+      "request_id": "r6",
+      "route": "fast",
+      "requested_model": "fast",
+      "provider": "groq",
+      "model": "gpt-oss-20b",
+      "stream": true,
+      "status": 200,
+      "latency_ms": 400,
+      "ttft_ms": 50,
+      "attempts": 1,
+      "tried": "groq:200",
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "cost_usd": 0,
+      "error": "connection lost"
+    },
+    {
+      "time": "2026-11-20T10:02:40Z",
+      "request_id": "r5",
+      "route": "direct",
+      "requested_model": "gemini/gemini-2.5-flash",
+      "provider": "",
+      "model": "",
+      "stream": false,
+      "status": 429,
+      "latency_ms": 900,
+      "ttft_ms": 0,
+      "attempts": 2,
+      "tried": "gemini:429 gemini:429",
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "cost_usd": 0,
+      "error": "rate limited"
+    },
+    {
+      "time": "2026-11-20T10:01:50Z",
+      "request_id": "r4",
+      "route": "fast",
+      "requested_model": "fast",
+      "provider": "groq",
+      "model": "gpt-oss-20b",
+      "stream": false,
+      "status": 200,
+      "latency_ms": 120,
+      "ttft_ms": 0,
+      "attempts": 1,
+      "tried": "groq:200",
+      "prompt_tokens": 10,
+      "completion_tokens": 20,
+      "cost_usd": 0.0001
+    },
+    {
+      "time": "2026-11-20T10:01:40Z",
+      "request_id": "r3",
+      "route": "default",
+      "requested_model": "anything",
+      "provider": "",
+      "model": "",
+      "stream": false,
+      "status": 502,
+      "latency_ms": 1,
+      "ttft_ms": 0,
+      "attempts": 3,
+      "tried": "gemini:401 groq:401 openrouter:401",
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "cost_usd": 0,
+      "error": "all 3 attempts failed"
+    },
+    {
+      "time": "2026-11-20T10:00:50Z",
+      "request_id": "r2",
+      "route": "demo",
+      "requested_model": "demo",
+      "provider": "mock",
+      "model": "mock-2",
+      "stream": true,
+      "status": 200,
+      "latency_ms": 8,
+      "ttft_ms": 3,
+      "attempts": 2,
+      "tried": "mock-flaky:429 mock:200",
+      "prompt_tokens": 2,
+      "completion_tokens": 5,
+      "cost_usd": 0
+    },
+    {
+      "time": "2026-11-20T10:00:30Z",
+      "request_id": "r1",
+      "route": "demo",
+      "requested_model": "demo",
+      "provider": "mock",
+      "model": "mock-2",
+      "stream": false,
+      "status": 200,
+      "latency_ms": 5,
+      "ttft_ms": 0,
+      "attempts": 2,
+      "tried": "mock-flaky:429 mock:200",
+      "prompt_tokens": 2,
+      "completion_tokens": 5,
+      "cost_usd": 0
+    }
+  ]
+}

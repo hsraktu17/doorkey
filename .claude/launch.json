@@ -1,0 +1,36 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "gateway-mocks",
+      "runtimeExecutable": "go",
+      "runtimeArgs": [
+        "run",
+        "./cmd/doorkey",
+        "-config",
+        "web/e2e/doorkey.e2e.json",
+        "-addr",
+        "127.0.0.1:18089"
+      ],
+      "port": 18089
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "DOORKEY_URL=http://127.0.0.1:18089",
+        "npx",
+        "--prefix",
+        "web",
+        "next",
+        "dev",
+        "web",
+        "-H",
+        "127.0.0.1",
+        "-p",
+        "3000"
+      ],
+      "port": 3000
+    }
+  ]
+}

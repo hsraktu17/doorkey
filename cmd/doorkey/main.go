@@ -15,13 +15,19 @@ import (
 
 	"github.com/hsraktu17/doorkey/internal/config"
 	"github.com/hsraktu17/doorkey/internal/handler"
+	"github.com/hsraktu17/doorkey/internal/logger"
 	"github.com/hsraktu17/doorkey/internal/providers"
 	"github.com/hsraktu17/doorkey/internal/router"
 	"github.com/hsraktu17/doorkey/internal/usage"
 )
 
 func main() {
-	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	log, err := logger.FromEnv(os.Stdout)
+	if err != nil {
+		// Fall back to a plain JSON logger so the bad setting is still reported.
+		slog.New(slog.NewJSONHandler(os.Stderr, nil)).Error("invalid log settings", "error", err)
+		os.Exit(2)
+	}
 	if err := run(log); err != nil {
 		log.Error("doorkey failed", "error", err)
 		os.Exit(1)
@@ -63,11 +69,15 @@ func run(log *slog.Logger) error {
 		log.Warn("DOORKEY_API_KEY is not set: the gateway accepts requests without a key")
 	}
 
+	metrics := usage.NewStore(usage.DefaultCapacity)
 	h := handler.New(handler.Options{
 		Router: rt,
 		Routes: cfg.Routes,
-		Log:    usage.NewLogger(log, pricing),
-		APIKey: apiKey,
+		// Each finished request is priced, then goes to the metrics store
+		// (for the dashboard) and the access log.
+		Recorder: usage.NewRecorder(pricing, metrics, logger.NewRequestLog(log)),
+		APIKey:   apiKey,
+		Metrics:  metrics,
 	})
 	srv := &http.Server{
 		Addr:              cfg.Listen,

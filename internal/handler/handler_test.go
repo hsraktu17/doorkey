@@ -11,8 +11,10 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hsraktu17/doorkey/internal/api"
+	"github.com/hsraktu17/doorkey/internal/logger"
 	"github.com/hsraktu17/doorkey/internal/providers"
 	"github.com/hsraktu17/doorkey/internal/providers/mock"
 	"github.com/hsraktu17/doorkey/internal/router"
@@ -63,7 +65,8 @@ func newServer(t *testing.T, apiKey string) (*httptest.Server, *bytes.Buffer) {
 	h := New(Options{
 		Router: rt,
 		Routes: routes,
-		Log:    usage.NewLogger(slog.New(slog.NewJSONHandler(&logs, nil)), usage.Pricing{"mock/m2": {InputPerMTok: 1e6, OutputPerMTok: 1e6}}),
+		Recorder: usage.NewRecorder(usage.Pricing{"mock/m2": {InputPerMTok: 1e6, OutputPerMTok: 1e6}},
+			logger.NewRequestLog(slog.New(slog.NewJSONHandler(&logs, nil)))),
 		APIKey: apiKey,
 	})
 	srv := httptest.NewServer(h)
@@ -284,5 +287,97 @@ func TestAllFailedListsEveryAttempt(t *testing.T) {
 	if !strings.Contains(e.Error.Message, "all 2 attempts failed") ||
 		!strings.Contains(e.Error.Message, "mock-flaky") || !strings.Contains(e.Error.Message, "broken") {
 		t.Fatalf("message = %q", e.Error.Message)
+	}
+}
+
+func newMetricsServer(t *testing.T, apiKey string, store *usage.Store) *httptest.Server {
+	t.Helper()
+	rt := router.New(mock.New("mock", mock.Options{}), mock.New("mock-flaky", mock.Options{FailStatus: 429}))
+	opts := Options{
+		Router:   rt,
+		Routes:   map[string]router.Route{"demo": {Targets: []router.Target{{Provider: "mock-flaky", Model: "a"}, {Provider: "mock", Model: "b"}}}},
+		Recorder: usage.NewRecorder(usage.Pricing{}, store, logger.NewRequestLog(slog.New(slog.NewJSONHandler(io.Discard, nil)))),
+		APIKey:   apiKey,
+	}
+	if store != nil {
+		opts.Metrics = store
+	}
+	srv := httptest.NewServer(New(opts))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func getMetrics(t *testing.T, srv *httptest.Server, query, key string) (*http.Response, usage.Metrics) {
+	t.Helper()
+	req, _ := http.NewRequest(http.MethodGet, srv.URL+"/admin/metrics"+query, nil)
+	if key != "" {
+		req.Header.Set("Authorization", "Bearer "+key)
+	}
+	resp, err := srv.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var m usage.Metrics
+	json.NewDecoder(resp.Body).Decode(&m)
+	return resp, m
+}
+
+func TestMetricsEndpointCountsTraffic(t *testing.T) {
+	store := usage.NewStore(100)
+	srv := newMetricsServer(t, "", store)
+	post(t, srv, chatBody("demo", false, ""), nil)
+	resp := post(t, srv, chatBody("demo", true, ""), nil)
+	readSSE(t, resp.Body) // let the stream finish so it is logged
+
+	// The handler logs after the client has read [DONE], so wait briefly
+	// for the second record to land.
+	var r *http.Response
+	var m usage.Metrics
+	for i := 0; i < 100; i++ {
+		if r, m = getMetrics(t, srv, "?window=5m", ""); m.Totals.Requests == 2 {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if r.StatusCode != 200 || r.Header.Get("Cache-Control") != "no-store" {
+		t.Fatalf("status %d, cache-control %q", r.StatusCode, r.Header.Get("Cache-Control"))
+	}
+	if m.WindowSeconds != 300 || m.Totals.Requests != 2 || m.Totals.Fallbacks != 2 || m.Totals.StreamRequests != 1 {
+		t.Fatalf("totals = %+v", m.Totals)
+	}
+	var flaky *usage.ProviderStats
+	for i := range m.Providers {
+		if m.Providers[i].Provider == "mock-flaky" {
+			flaky = &m.Providers[i]
+		}
+	}
+	if flaky == nil || flaky.Status429 != 2 {
+		t.Fatalf("providers = %+v", m.Providers)
+	}
+	if len(m.Recent) != 2 || m.Recent[0].Tried != "mock-flaky:429 mock:200" {
+		t.Fatalf("recent = %+v", m.Recent)
+	}
+}
+
+func TestMetricsEndpointAuthAndValidation(t *testing.T) {
+	srv := newMetricsServer(t, "secret", usage.NewStore(10))
+	if r, _ := getMetrics(t, srv, "", ""); r.StatusCode != http.StatusUnauthorized {
+		t.Errorf("no key: %d", r.StatusCode)
+	}
+	if r, _ := getMetrics(t, srv, "", "secret"); r.StatusCode != 200 {
+		t.Errorf("right key: %d", r.StatusCode)
+	}
+	for _, q := range []string{"?window=abc", "?window=10s", "?window=48h"} {
+		if r, _ := getMetrics(t, srv, q, "secret"); r.StatusCode != http.StatusBadRequest {
+			t.Errorf("%s: %d, want 400", q, r.StatusCode)
+		}
+	}
+}
+
+func TestMetricsEndpointOffWithoutStore(t *testing.T) {
+	srv := newMetricsServer(t, "", nil)
+	if r, _ := getMetrics(t, srv, "", ""); r.StatusCode != http.StatusNotFound {
+		t.Errorf("status %d, want 404", r.StatusCode)
 	}
 }
